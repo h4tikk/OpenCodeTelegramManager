@@ -1,6 +1,6 @@
 import base64, importlib.util, json, os, pathlib, socket, subprocess, tempfile, unittest, shutil
 
-HERE = pathlib.Path(__file__).resolve().parent
+RUNTIME = pathlib.Path(__file__).resolve().parents[2] / "deploy/autonomy"
 
 
 class SandboxTests(unittest.TestCase):
@@ -12,8 +12,8 @@ class SandboxTests(unittest.TestCase):
         runtime = self.base / "runtime"
         runtime.mkdir()
         self.runner = runtime / "sandbox.py"
-        shutil.copy2(HERE / "sandbox.py", self.runner)
-        shutil.copy2(HERE / "workspace.py", runtime / "workspace.py")
+        shutil.copy2(RUNTIME / "sandbox.py", self.runner)
+        shutil.copy2(RUNTIME / "workspace.py", runtime / "workspace.py")
         (runtime / "settings.json").write_text(
             json.dumps({"roots": [str(self.root)], "readOnlyCaches": []})
         )
@@ -46,7 +46,7 @@ class SandboxTests(unittest.TestCase):
         result = self.run_command(
             "printf okay > result.txt; test ! -e '"
             + str(outside)
-            + '\' && test ! -s .env && test ! -e /etc/shadow && test ! -e /home/hatikk/.ssh && test -z "$MANAGER_TEST_SECRET"'
+            + '\' && test ! -s .env && test ! -e /etc/shadow && test ! -e /home/runner/.ssh && test -z "$MANAGER_TEST_SECRET"'
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.root / "result.txt").read_text(), "okay")

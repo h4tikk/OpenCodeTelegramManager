@@ -24,3 +24,13 @@ downloads/
 attachments/
 __pycache__/
 *.pyc
+
+**/.env
+**/.env.*
+*.pfx
+*.p12
+auth.json
+service.json
+appsettings.Local.json
+appsettings.*.local.json
+!.env.example

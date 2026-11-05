@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, symlinkSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { decide, commandRisk } from './policy.mjs';
-import { install } from './integration.mjs';
+import { decide, commandRisk } from '../../deploy/autonomy/policy.mjs';
+import { install } from '../../deploy/autonomy/integration.mjs';
 const root = mkdtempSync(path.join(os.tmpdir(),'manager-policy-'));
 try {
   mkdirSync(path.join(root,'src'));

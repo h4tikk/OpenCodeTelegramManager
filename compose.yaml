@@ -9,7 +9,7 @@ services:
     container_name: opencode-manager
     network_mode: host
     restart: unless-stopped
-    user: "${MANAGER_UID:-1000}:${MANAGER_GID:-1000}"
+    user: "${MANAGER_UID:?Set MANAGER_UID in .env}:${MANAGER_GID:?Set MANAGER_GID in .env}"
     init: true
     read_only: true
     cap_drop: [ALL]
@@ -19,21 +19,21 @@ services:
     pids_limit: 128
     environment:
       Manager__EnvironmentFile: /run/secrets/manager_env
-      Storage__DatabasePath: ${MANAGER_DATA_DIR:-/home/hatikk/.local/share/opencode-manager}/manager.db
-      Files__DataDirectory: ${MANAGER_DATA_DIR:-/home/hatikk/.local/share/opencode-manager}
-      Projects__AllowedRoots__0: /mnt/data/Projects
+      Storage__DatabasePath: ${MANAGER_DATA_DIR:?Set MANAGER_DATA_DIR in .env}/manager.db
+      Files__DataDirectory: ${MANAGER_DATA_DIR:?Set MANAGER_DATA_DIR in .env}
+      Projects__AllowedRoots__0: ${MANAGER_PROJECTS_ROOT:?Set MANAGER_PROJECTS_ROOT in .env}
       HOME: /tmp
       XDG_CACHE_HOME: /tmp/cache
     secrets: [manager_env]
     volumes:
       - type: bind
-        source: /mnt/data/Projects
-        target: /mnt/data/Projects
+        source: ${MANAGER_PROJECTS_ROOT:?Set MANAGER_PROJECTS_ROOT in .env}
+        target: ${MANAGER_PROJECTS_ROOT:?Set MANAGER_PROJECTS_ROOT in .env}
         bind:
           create_host_path: false
       - type: bind
-        source: ${MANAGER_DATA_DIR:-/home/hatikk/.local/share/opencode-manager}
-        target: ${MANAGER_DATA_DIR:-/home/hatikk/.local/share/opencode-manager}
+        source: ${MANAGER_DATA_DIR:?Set MANAGER_DATA_DIR in .env}
+        target: ${MANAGER_DATA_DIR:?Set MANAGER_DATA_DIR in .env}
         bind:
           create_host_path: false
     tmpfs: ["/tmp:rw,nosuid,nodev,size=128m,mode=1777"]
@@ -50,4 +50,4 @@ services:
         max-file: "3"
 secrets:
   manager_env:
-    file: ${MANAGER_ENV_FILE:-/home/hatikk/.config/opencode-manager/manager.env}
+    file: ${MANAGER_ENV_FILE:-.env}

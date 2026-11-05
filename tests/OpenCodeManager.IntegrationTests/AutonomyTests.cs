@@ -73,7 +73,7 @@ public sealed class AutonomyTests
             RedirectStandardError = true,
             UseShellExecute = false
         };
-        start.ArgumentList.Add(Path.Combine(root.FullName, "deploy/autonomy", script));
+        start.ArgumentList.Add(Path.Combine(root.FullName, "tests/autonomy", script));
         using var process = Process.Start(start)!;
         var output = process.StandardOutput.ReadToEndAsync();
         var error = process.StandardError.ReadToEndAsync();
