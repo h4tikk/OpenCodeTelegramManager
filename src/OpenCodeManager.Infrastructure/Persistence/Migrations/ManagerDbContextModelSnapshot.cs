@@ -156,10 +156,43 @@ namespace OpenCodeManager.Infrastructure.Persistence.Migrations
                     b.ToTable("Tasks");
                 });
 
+            modelBuilder.Entity("OpenCodeManager.Domain.DirectoryBookmark", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CanonicalPath")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsFavorite")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("LastOpenedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("OwnerUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerUserId", "CanonicalPath")
+                        .IsUnique();
+
+                    b.ToTable("Bookmarks");
+                });
+
             modelBuilder.Entity("OpenCodeManager.Domain.NavigationState", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("BrowserMessageId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("BrowserPath")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("DefaultAgent")
@@ -182,6 +215,9 @@ namespace OpenCodeManager.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid?>("SelectedSessionId")
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("ShowHiddenDirectories")
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("TelegramOffset")
                         .HasColumnType("INTEGER");
@@ -281,6 +317,28 @@ namespace OpenCodeManager.Infrastructure.Persistence.Migrations
                     b.HasIndex("ParentProjectId");
 
                     b.ToTable("Projects");
+                });
+
+            modelBuilder.Entity("OpenCodeManager.Domain.RegisteredRoot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CanonicalPath")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CanonicalPath")
+                        .IsUnique();
+
+                    b.ToTable("Roots");
                 });
 
             modelBuilder.Entity("OpenCodeManager.Domain.TaskAttempt", b =>

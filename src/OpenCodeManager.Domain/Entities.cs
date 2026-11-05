@@ -106,6 +106,9 @@ public sealed class NavigationState : Entity
     public string? DefaultModelId { get; set; }
     public string? DefaultAgent { get; set; }
     public string? InputMode { get; set; }
+    public string? BrowserPath { get; set; }
+    public int? BrowserMessageId { get; set; }
+    public bool ShowHiddenDirectories { get; set; }
     public long TelegramOffset { get; set; }
     public string? PendingAttachmentText { get; set; }
 }
@@ -121,4 +124,17 @@ public static class TaskStates
          AgentTaskStatus.Completed or AgentTaskStatus.Failed or AgentTaskStatus.Cancelled or AgentTaskStatus.AwaitingApproval or AgentTaskStatus.Running or AgentTaskStatus.NeedsReconciliation) => true,
         _ => false
     };
+}
+
+public sealed class RegisteredRoot : Entity
+{
+    public string Name { get; set; } = "";
+    public string CanonicalPath { get; set; } = "";
+}
+public sealed class DirectoryBookmark : Entity
+{
+    public long OwnerUserId { get; set; }
+    public string CanonicalPath { get; set; } = "";
+    public bool IsFavorite { get; set; }
+    public DateTime LastOpenedAtUtc { get; set; } = DateTime.UtcNow;
 }

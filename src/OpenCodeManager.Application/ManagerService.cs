@@ -110,6 +110,31 @@ public sealed class ManagerService(IManagerDbFactory factory, IOpenCodeClient ap
         }
         finally { syncLock.Release(); }
     }
+    public async Task SyncDirectoryAsync(string directory, CancellationToken ct)
+    {
+        var canonical = paths.DemandAllowed(directory);
+        await syncLock.WaitAsync(ct);
+        try
+        {
+            await using var db = await factory.CreateAsync(ct);
+            var project = await db.Projects.SingleAsync(x => x.AbsolutePath == canonical, ct);
+            string? cursor = null; var seen = new HashSet<string>();
+            do
+            {
+                var page = await api.GetDirectorySessionsAsync(canonical, cursor, ct);
+                foreach (var remote in page.Data)
+                {
+                    if (remote.Location.Directory is null || paths.Canonicalize(remote.Location.Directory) != canonical) continue;
+                    var s = await db.Sessions.SingleOrDefaultAsync(x => x.OpenCodeSessionId == remote.Id, ct);
+                    if (s is null) { s = new() { OpenCodeSessionId = remote.Id, ProjectId = project.Id, WorkingDirectory = canonical }; db.Sessions.Add(s); }
+                    s.Title = remote.Title ?? remote.Id; s.AgentName = remote.Agent; s.ModelId = remote.Model?.Id; s.ProviderId = remote.Model?.ProviderId; s.LastSyncedAtUtc = DateTime.UtcNow;
+                }
+                cursor = page.Cursor?.Next;
+            } while (cursor is not null && seen.Add(cursor));
+            await db.SaveChangesAsync(ct);
+        }
+        finally { syncLock.Release(); }
+    }
     private bool SafeSamePath(string a, string b) { try { return paths.Canonicalize(a) == b; } catch (IOException) { return false; } }
     private async Task<AgentSession> CreateRemoteSession(Project project, string title, bool main, Guid? parent, CancellationToken ct)
     {

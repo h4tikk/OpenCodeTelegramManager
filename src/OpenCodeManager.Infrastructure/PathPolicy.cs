@@ -47,23 +47,12 @@ public sealed class PathPolicy(ProjectOptions options) : IPathPolicy
     public IEnumerable<(string Path, string? Parent, ProjectKind Kind)> Discover()
     {
         var seen = new HashSet<string>(StringComparer.Ordinal);
-        int count = 0;
         foreach (var root in options.AllowedRoots.Where(Directory.Exists))
-        {
-            var pending = new Queue<(string Path, string? Parent, int Depth)>();
-            foreach (var child in Directory.EnumerateDirectories(root).Order()) pending.Enqueue((child, null, 0));
-            while (pending.TryDequeue(out var item) && count < options.MaxDiscoveredDirectories)
+            foreach (var child in Directory.EnumerateDirectories(root).Order())
             {
                 string actual;
-                try { actual = DemandAllowed(item.Path); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { continue; }
-                if (!seen.Add(actual)) continue;
-                count++;
-                yield return (actual, item.Parent, item.Depth == 0 ? ProjectKind.Category : Directory.Exists(Path.Combine(actual, ".git")) || File.Exists(Path.Combine(actual, ".git")) ? ProjectKind.Repository : ProjectKind.Directory);
-                if (item.Depth >= options.DiscoveryDepth) continue;
-                string[] dirs;
-                try { dirs = Directory.GetDirectories(actual); } catch (UnauthorizedAccessException) { continue; }
-                foreach (var dir in dirs.Order()) if (!Path.GetFileName(dir).StartsWith('.') && !Excluded.Contains(Path.GetFileName(dir))) pending.Enqueue((dir, actual, item.Depth + 1));
+                try { actual = DemandAllowed(child); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { continue; }
+                if (!Path.GetFileName(actual).StartsWith('.') && seen.Add(actual)) yield return (actual, null, ProjectKind.Category);
             }
-        }
     }
 }

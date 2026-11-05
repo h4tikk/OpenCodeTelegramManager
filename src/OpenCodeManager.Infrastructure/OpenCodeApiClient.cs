@@ -55,6 +55,7 @@ public sealed class OpenCodeApiClient(HttpClient http, OpenCodeOptions options) 
     public async Task<List<OpenCodeAgent>> GetAgentsAsync(string? directory, CancellationToken ct) => (await Get<ApiData<List<OpenCodeAgent>>>("/api/agent" + Location(directory), ct)).Data;
     public async Task<List<OpenCodeProvider>> GetProvidersAsync(CancellationToken ct) => (await Get<ApiData<List<OpenCodeProvider>>>("/api/provider", ct)).Data;
     public Task<ApiPage<OpenCodeSession>> GetSessionsAsync(string? cursor, CancellationToken ct) => Get<ApiPage<OpenCodeSession>>("/api/session?limit=100" + (cursor is null ? "" : "&cursor=" + E(cursor)), ct);
+    public Task<ApiPage<OpenCodeSession>> GetDirectorySessionsAsync(string directory, string? cursor, CancellationToken ct) => Get<ApiPage<OpenCodeSession>>("/api/session?limit=100&directory=" + E(directory) + (cursor is null ? "" : "&cursor=" + E(cursor)), ct);
     public async Task<OpenCodeSession> GetSessionAsync(string id, CancellationToken ct) => (await Get<ApiData<OpenCodeSession>>("/api/session/" + E(id), ct)).Data;
     public async Task<OpenCodeSession> CreateSessionAsync(CreateSessionRequest request, CancellationToken ct) => (await Write<ApiData<OpenCodeSession>>(HttpMethod.Post, "/api/session", request, ct)).Data;
     public Task UpdateSessionAsync(string id, string? title, bool? archived, List<PermissionRule>? permissions, CancellationToken ct) => Write(HttpMethod.Patch, "/api/session/" + E(id), new { title, archived, permissions }, ct);

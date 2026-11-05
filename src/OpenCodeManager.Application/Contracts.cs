@@ -15,6 +15,8 @@ public interface IManagerDb : IAsyncDisposable
     DbSet<TelegramMessage> TelegramMessages { get; }
     DbSet<PermissionRequest> Permissions { get; }
     DbSet<NavigationState> Navigation { get; }
+    DbSet<RegisteredRoot> Roots { get; }
+    DbSet<DirectoryBookmark> Bookmarks { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
 public interface IManagerDbFactory { Task<IManagerDb> CreateAsync(CancellationToken ct = default); }
@@ -55,6 +57,7 @@ public interface IOpenCodeClient
     Task<List<OpenCodeAgent>> GetAgentsAsync(string? directory, CancellationToken ct);
     Task<List<OpenCodeProvider>> GetProvidersAsync(CancellationToken ct);
     Task<ApiPage<OpenCodeSession>> GetSessionsAsync(string? cursor, CancellationToken ct);
+    Task<ApiPage<OpenCodeSession>> GetDirectorySessionsAsync(string directory, string? cursor, CancellationToken ct);
     Task<OpenCodeSession> GetSessionAsync(string id, CancellationToken ct);
     Task<OpenCodeSession> CreateSessionAsync(CreateSessionRequest request, CancellationToken ct);
     Task UpdateSessionAsync(string id, string? title, bool? archived, List<PermissionRule>? permissions, CancellationToken ct);
