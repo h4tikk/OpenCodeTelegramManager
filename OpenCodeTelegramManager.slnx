@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/OpenCodeManager.Application/OpenCodeManager.Application.csproj" />
+    <Project Path="src/OpenCodeManager.Domain/OpenCodeManager.Domain.csproj" />
+    <Project Path="src/OpenCodeManager.Infrastructure/OpenCodeManager.Infrastructure.csproj" />
+    <Project Path="src/OpenCodeManager.Telegram/OpenCodeManager.Telegram.csproj" />
+    <Project Path="src/OpenCodeManager.Worker/OpenCodeManager.Worker.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/OpenCodeManager.IntegrationTests/OpenCodeManager.IntegrationTests.csproj" />
+    <Project Path="tests/OpenCodeManager.UnitTests/OpenCodeManager.UnitTests.csproj" />
+  </Folder>
+</Solution>

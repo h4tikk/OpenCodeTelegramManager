@@ -1,0 +1,13 @@
+**/bin/
+**/obj/
+.artifacts/
+.local/
+.env
+*.env
+!*.env.example
+*.db*
+*.sqlite*
+.idea/
+.vs/
+.vscode/
+TestResults/
