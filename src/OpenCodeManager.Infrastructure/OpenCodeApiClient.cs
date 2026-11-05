@@ -62,6 +62,7 @@ public sealed class OpenCodeApiClient(HttpClient http, OpenCodeOptions options) 
     public Task SwitchModelAsync(string id, ModelRef model, CancellationToken ct) => Write(HttpMethod.Post, "/api/session/" + E(id) + "/model", new { model }, ct);
     public Task SwitchAgentAsync(string id, string agent, CancellationToken ct) => Write(HttpMethod.Post, "/api/session/" + E(id) + "/agent", new { agent }, ct);
     public async Task<OpenCodeInbox> SendPromptAsync(string sessionId, PromptRequest prompt, CancellationToken ct) => (await Write<ApiData<OpenCodeInbox>>(HttpMethod.Post, "/api/session/" + E(sessionId) + "/prompt", prompt, ct)).Data;
+    public Task CancelInboxAsync(string sessionId,string messageId,CancellationToken ct)=>Write(HttpMethod.Delete,"/api/session/"+E(sessionId)+"/inbox/"+E(messageId),null,ct);
     public Task InterruptAsync(string sessionId, CancellationToken ct) => Write(HttpMethod.Post, "/api/session/" + E(sessionId) + "/interrupt", null, ct);
     public Task<ApiPage<OpenCodeMessage>> GetMessagesAsync(string sessionId, string? cursor, CancellationToken ct) => Get<ApiPage<OpenCodeMessage>>("/api/session/" + E(sessionId) + "/message?limit=100" + (cursor is null ? "&order=desc" : "&cursor=" + E(cursor)), ct);
     public async Task<List<OpenCodeInbox>> GetInboxAsync(string sessionId, CancellationToken ct) => (await Get<ApiData<List<OpenCodeInbox>>>("/api/session/" + E(sessionId) + "/inbox", ct)).Data;

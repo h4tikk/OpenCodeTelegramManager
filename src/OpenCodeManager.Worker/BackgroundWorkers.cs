@@ -35,3 +35,15 @@ public sealed class OpenCodeEventListener(IOpenCodeClient api, TaskEngine engine
         }
     }
 }
+
+public sealed class HealthWorker(StorageOptions storage) : BackgroundService
+{
+    protected override async Task ExecuteAsync(CancellationToken ct)
+    {
+        while(!ct.IsCancellationRequested)
+        {
+            await File.WriteAllTextAsync(Path.Combine(Path.GetDirectoryName(storage.DatabasePath)!, "worker.heartbeat"),DateTime.UtcNow.ToString("O"),ct);
+            await Task.Delay(TimeSpan.FromSeconds(10),ct);
+        }
+    }
+}

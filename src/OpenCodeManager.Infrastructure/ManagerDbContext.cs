@@ -15,6 +15,9 @@ public sealed class ManagerDbContext(DbContextOptions<ManagerDbContext> options)
     public DbSet<TelegramMessage> TelegramMessages => Set<TelegramMessage>();
     public DbSet<PermissionRequest> Permissions => Set<PermissionRequest>();
     public DbSet<NavigationState> Navigation => Set<NavigationState>();
+    public DbSet<FileAttachment> Attachments => Set<FileAttachment>();
+    public DbSet<FileTransfer> Transfers => Set<FileTransfer>();
+    public DbSet<TaskFile> TaskFiles => Set<TaskFile>();
     public DbSet<RegisteredRoot> Roots => Set<RegisteredRoot>();
     public DbSet<DirectoryBookmark> Bookmarks => Set<DirectoryBookmark>();
     protected override void OnModelCreating(ModelBuilder m)
@@ -39,6 +42,11 @@ public sealed class ManagerDbContext(DbContextOptions<ManagerDbContext> options)
         m.Entity<PermissionRequest>().HasOne<AgentTask>().WithMany().HasForeignKey(x => x.TaskId).OnDelete(DeleteBehavior.Cascade);
         m.Entity<PermissionRequest>().HasIndex(x => new { x.OpenCodeSessionId, x.OpenCodeRequestId }).IsUnique();
         m.Entity<NavigationState>().HasIndex(x => x.UserId).IsUnique();
+        m.Entity<FileAttachment>().HasOne<AgentTask>().WithMany().HasForeignKey(x => x.TaskId).OnDelete(DeleteBehavior.SetNull);
+        m.Entity<FileTransfer>().HasOne<FileAttachment>().WithMany().HasForeignKey(x => x.AttachmentId).OnDelete(DeleteBehavior.SetNull);
+        m.Entity<TaskFile>().HasOne<AgentTask>().WithMany().HasForeignKey(x => x.TaskId).OnDelete(DeleteBehavior.Cascade);
+        m.Entity<TaskFile>().HasOne<FileAttachment>().WithMany().HasForeignKey(x => x.AttachmentId).OnDelete(DeleteBehavior.Restrict);
+        m.Entity<TaskFile>().HasIndex(x => new { x.TaskId, x.AttachmentId }).IsUnique();
         m.Entity<RegisteredRoot>().HasIndex(x => x.CanonicalPath).IsUnique();
         m.Entity<DirectoryBookmark>().HasIndex(x => new { x.OwnerUserId, x.CanonicalPath }).IsUnique();
         foreach (var entity in m.Model.GetEntityTypes())

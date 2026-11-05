@@ -65,10 +65,11 @@ public sealed partial class TelegramInterface
     private async Task BrowseAsync(string path,int page,int? messageId,CancellationToken ct)
     {
         var nav=await manager.NavigationAsync(security.OwnerUserId,ct); var listing=await browser.GetDirectoriesAsync(path,page,nav.ShowHiddenDirectories,ct);
+        if(nav.BrowserPath!=listing.CanonicalPath) nav.FileSearchQuery=null;
         nav.BrowserPath=listing.CanonicalPath; await manager.SaveNavigationAsync(nav,ct);
         var rows=listing.Directories.Select(x=>new[]{B("📁 "+x.Name+(x.IsSymbolicLink?" ↗":""),"fdir",StoreChoice("directory",x.CanonicalPath,null,null))}).ToList();
         var paging=new List<InlineKeyboardButton>(); if(page>0)paging.Add(B("←","fpage",(page-1).ToString())); if(listing.HasMore)paging.Add(B("→","fpage",(page+1).ToString())); if(paging.Count>0)rows.Add(paging.ToArray());
-        if(listing.Error is null) rows.Add([B("Открыть эту папку","fopen","0")]);
+        if(listing.Error is null) { rows.Add([B("Открыть эту папку","fopen","0"),B("Файлы","flist","0")]); rows.Add([B("Создать папку","fmkdir","0"),B("Скачать ZIP","fzipdir","0")]); }
         rows.Add([B("Назад","fback","0"),B("В корень","files","0")]); rows.Add([B(nav.ShowHiddenDirectories?"Скрытые: да":"Скрытые: нет","fhidden","0")]);
         await RenderBrowserAsync("Путь:\n"+listing.CanonicalPath+"\n"+(listing.Error??"Страница "+(page+1)),new(rows),messageId,ct);
     }

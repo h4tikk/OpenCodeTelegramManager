@@ -15,7 +15,7 @@ namespace OpenCodeManager.Infrastructure.Persistence.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.14");
 
             modelBuilder.Entity("OpenCodeManager.Domain.AgentSession", b =>
                 {
@@ -117,6 +117,9 @@ namespace OpenCodeManager.Infrastructure.Persistence.Migrations
                     b.Property<string>("ModelId")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("ObservedToolCalls")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Prompt")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -183,6 +186,88 @@ namespace OpenCodeManager.Infrastructure.Persistence.Migrations
                     b.ToTable("Bookmarks");
                 });
 
+            modelBuilder.Entity("OpenCodeManager.Domain.FileAttachment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("Height")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("LocalPath")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("MimeType")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OriginalName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("Size")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid?>("TaskId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TelegramFileId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("Width")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TaskId");
+
+                    b.ToTable("Attachments");
+                });
+
+            modelBuilder.Entity("OpenCodeManager.Domain.FileTransfer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("AttachmentId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Direction")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LocalPath")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("StartedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AttachmentId");
+
+                    b.ToTable("Transfers");
+                });
+
             modelBuilder.Entity("OpenCodeManager.Domain.NavigationState", b =>
                 {
                     b.Property<Guid>("Id")
@@ -204,10 +289,28 @@ namespace OpenCodeManager.Infrastructure.Persistence.Migrations
                     b.Property<string>("DefaultProviderId")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("DraftAgent")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DraftModelId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DraftProviderId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FileSearchQuery")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("InputMode")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("PendingAttachmentText")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PendingFileIdsJson")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SelectedFilesJson")
                         .HasColumnType("TEXT");
 
                     b.Property<Guid?>("SelectedProjectId")
@@ -419,6 +522,28 @@ namespace OpenCodeManager.Infrastructure.Persistence.Migrations
                     b.ToTable("Events");
                 });
 
+            modelBuilder.Entity("OpenCodeManager.Domain.TaskFile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("AttachmentId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("TaskId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AttachmentId");
+
+                    b.HasIndex("TaskId", "AttachmentId")
+                        .IsUnique();
+
+                    b.ToTable("TaskFiles");
+                });
+
             modelBuilder.Entity("OpenCodeManager.Domain.TelegramMessage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -478,6 +603,22 @@ namespace OpenCodeManager.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("OpenCodeManager.Domain.FileAttachment", b =>
+                {
+                    b.HasOne("OpenCodeManager.Domain.AgentTask", null)
+                        .WithMany()
+                        .HasForeignKey("TaskId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
+            modelBuilder.Entity("OpenCodeManager.Domain.FileTransfer", b =>
+                {
+                    b.HasOne("OpenCodeManager.Domain.FileAttachment", null)
+                        .WithMany()
+                        .HasForeignKey("AttachmentId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
             modelBuilder.Entity("OpenCodeManager.Domain.PermissionRequest", b =>
                 {
                     b.HasOne("OpenCodeManager.Domain.AgentTask", null)
@@ -511,6 +652,21 @@ namespace OpenCodeManager.Infrastructure.Persistence.Migrations
                     b.HasOne("OpenCodeManager.Domain.TaskAttempt", null)
                         .WithMany()
                         .HasForeignKey("AttemptId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("OpenCodeManager.Domain.TaskFile", b =>
+                {
+                    b.HasOne("OpenCodeManager.Domain.FileAttachment", null)
+                        .WithMany()
+                        .HasForeignKey("AttachmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("OpenCodeManager.Domain.AgentTask", null)
+                        .WithMany()
+                        .HasForeignKey("TaskId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

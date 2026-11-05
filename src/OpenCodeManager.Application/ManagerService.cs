@@ -157,7 +157,7 @@ public sealed class ManagerService(IManagerDbFactory factory, IOpenCodeClient ap
             var project = await db.Projects.SingleAsync(x => x.Id == projectId, ct);
             if (parent.HasValue && !await db.Sessions.AnyAsync(x => x.Id == parent, ct)) throw new ArgumentException("Unknown parent session");
             var session = await CreateRemoteSession(project, title.Trim(), false, parent, ct);
-            db.Sessions.Add(session); await db.SaveChangesAsync(ct); return session;
+            db.Sessions.Add(session); await db.SaveChangesAsync(ct); logger.LogInformation("Session {SessionId} created for {ProjectId}",session.Id,projectId);return session;
         }
         finally { syncLock.Release(); }
     }
@@ -180,27 +180,35 @@ public sealed class ManagerService(IManagerDbFactory factory, IOpenCodeClient ap
         var duplicate = await db.Tasks.SingleOrDefaultAsync(x => x.DeduplicationKey == deduplicationKey, ct); if (duplicate is not null) return duplicate;
         var session = await db.Sessions.SingleAsync(x => x.Id == sessionId, ct); paths.DemandAllowed(session.WorkingDirectory);
         var nav = await db.Navigation.SingleOrDefaultAsync(x => x.UserId == owner, ct);
-        var t = new AgentTask { SessionId = sessionId, Title = prompt[..Math.Min(80, prompt.Length)], Prompt = prompt, DeduplicationKey = deduplicationKey, LockKey = paths.LockKey(session.WorkingDirectory), CreatedByTelegramUserId = owner, ProviderId = session.ProviderId ?? nav?.DefaultProviderId, ModelId = session.ModelId ?? nav?.DefaultModelId, AgentName = session.AgentName ?? nav?.DefaultAgent };
+        var t = new AgentTask { SessionId = sessionId, Title = prompt[..Math.Min(80, prompt.Length)], Prompt = prompt, DeduplicationKey = deduplicationKey, LockKey = paths.LockKey(session.WorkingDirectory), CreatedByTelegramUserId = owner, ProviderId = nav?.DraftProviderId ?? session.ProviderId ?? nav?.DefaultProviderId, ModelId = nav?.DraftModelId ?? session.ModelId ?? nav?.DefaultModelId, AgentName = nav?.DraftAgent ?? session.AgentName ?? nav?.DefaultAgent };
         db.Tasks.Add(t);
+        var fileIds = System.Text.Json.JsonSerializer.Deserialize<List<Guid>>(nav?.PendingFileIdsJson ?? "[]") ?? [];
+        foreach (var fileId in fileIds.Distinct())
+        {
+            var file = await db.Attachments.SingleAsync(x => x.Id == fileId && x.ExpiresAtUtc > DateTime.UtcNow, ct);
+            db.TaskFiles.Add(new TaskFile { TaskId = t.Id, AttachmentId = fileId }); file.TaskId ??= t.Id;
+        }
+        if (nav is not null) { nav.PendingFileIdsJson = null; nav.DraftProviderId = null; nav.DraftModelId = null; nav.DraftAgent = null; }
         try { await db.SaveChangesAsync(ct); }
-        catch (DbUpdateException) { return await db.Tasks.AsNoTracking().SingleAsync(x => x.DeduplicationKey == deduplicationKey, ct); }
+        catch (DbUpdateException) { var replay=await db.Tasks.AsNoTracking().SingleOrDefaultAsync(x => x.DeduplicationKey == deduplicationKey, ct); if(replay is not null)return replay; throw; }
         logger.LogInformation("Task {TaskId} queued", t.Id); return t;
     }
-    public async Task SelectModelAsync(Guid? sessionId, ModelRef model, long owner, CancellationToken ct)
+    public async Task SelectModelAsync(Guid? sessionId, ModelRef model, long owner, CancellationToken ct, bool taskOnly = false)
     {
         guard.Demand(owner); await using var db = await factory.CreateAsync(ct);
         AgentSession? s = sessionId is null ? null : await db.Sessions.SingleAsync(x => x.Id == sessionId, ct);
         if (!(await api.GetModelsAsync(s?.WorkingDirectory, ct)).Any(x => x.Id == model.Id && x.ProviderId == model.ProviderId && x.Enabled)) throw new ArgumentException("Model unavailable in catalog");
-        if (s is not null) { s.ProviderId = model.ProviderId; s.ModelId = model.Id; }
+        if (taskOnly) { var nav=await db.Navigation.SingleAsync(x=>x.UserId==owner,ct); nav.DraftProviderId=model.ProviderId; nav.DraftModelId=model.Id; }
+        else if (s is not null) { s.ProviderId = model.ProviderId; s.ModelId = model.Id; }
         else { var nav = await db.Navigation.SingleAsync(x => x.UserId == owner, ct); nav.DefaultProviderId = model.ProviderId; nav.DefaultModelId = model.Id; }
         await db.SaveChangesAsync(ct);
     }
-    public async Task SelectAgentAsync(Guid? sessionId, string agent, long owner, CancellationToken ct)
+    public async Task SelectAgentAsync(Guid? sessionId, string agent, long owner, CancellationToken ct, bool taskOnly = false)
     {
         guard.Demand(owner); await using var db = await factory.CreateAsync(ct);
         AgentSession? s = sessionId is null ? null : await db.Sessions.SingleAsync(x => x.Id == sessionId, ct);
         if (!(await api.GetAgentsAsync(s?.WorkingDirectory, ct)).Any(x => x.Id == agent && !x.Hidden && x.Mode != "subagent")) throw new ArgumentException("Agent unavailable");
-        if (s is not null) s.AgentName = agent; else (await db.Navigation.SingleAsync(x => x.UserId == owner, ct)).DefaultAgent = agent;
+        if (taskOnly) (await db.Navigation.SingleAsync(x=>x.UserId==owner,ct)).DraftAgent=agent; else if (s is not null) s.AgentName = agent; else (await db.Navigation.SingleAsync(x => x.UserId == owner, ct)).DefaultAgent = agent;
         await db.SaveChangesAsync(ct);
     }
     public async Task CancelAsync(Guid taskId, long owner, CancellationToken ct)

@@ -15,6 +15,9 @@ public interface IManagerDb : IAsyncDisposable
     DbSet<TelegramMessage> TelegramMessages { get; }
     DbSet<PermissionRequest> Permissions { get; }
     DbSet<NavigationState> Navigation { get; }
+    DbSet<FileAttachment> Attachments { get; }
+    DbSet<FileTransfer> Transfers { get; }
+    DbSet<TaskFile> TaskFiles { get; }
     DbSet<RegisteredRoot> Roots { get; }
     DbSet<DirectoryBookmark> Bookmarks { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
@@ -24,7 +27,8 @@ public sealed record ApiData<T>(T Data);
 public sealed record ApiCursor(string? Previous, string? Next);
 public sealed record ApiPage<T>(List<T> Data, ApiCursor? Cursor);
 public sealed record ModelRef(string Id, [property: JsonPropertyName("providerID")] string ProviderId, string? Variant = null);
-public sealed record OpenCodeModel(string Id, [property: JsonPropertyName("providerID")] string ProviderId, string Name, bool Enabled, string Status);
+public sealed record OpenCodeModel(string Id, [property: JsonPropertyName("providerID")] string ProviderId, string Name, bool Enabled, string Status, ModelCapabilities? Capabilities = null);
+public sealed record ModelCapabilities(List<string> Input);
 public sealed record OpenCodeAgent(string Id, string Name, string Mode, bool Hidden);
 public sealed record OpenCodeProvider(string Id, string Name);
 public sealed record OpenCodeProject(string Id, string Canonical, string? Name);
@@ -33,7 +37,8 @@ public sealed record SessionTime(double Created, double Updated, double? Busy, d
 public sealed record PermissionRule(string Action, string Resource, string Effect);
 public sealed record OpenCodeSession(string Id, [property: JsonPropertyName("projectID")] string ProjectId, string? Title, LocationRef Location, SessionTime Time, string? Agent, ModelRef? Model, string? Outcome, List<PermissionRule>? Permissions);
 public sealed record CreateSessionRequest(string Id, string Title, LocationRef Location, List<PermissionRule> Permissions);
-public sealed record PromptRequest(string Id, string Text, Dictionary<string,string> Metadata);
+public sealed record OpenCodeFileInput(string Uri, string Name);
+public sealed record PromptRequest(string Id, string Text, Dictionary<string,string> Metadata, List<OpenCodeFileInput>? Files = null);
 public sealed record OpenCodeInbox(string Id, [property: JsonPropertyName("sessionID")] string SessionId, string Type);
 public sealed record MessageTime(double Created, double? Completed);
 public sealed record MessageContent(string Type, string? Text, string? Name);
@@ -65,6 +70,7 @@ public interface IOpenCodeClient
     Task SwitchAgentAsync(string id, string agent, CancellationToken ct);
     Task<OpenCodeInbox> SendPromptAsync(string sessionId, PromptRequest prompt, CancellationToken ct);
     Task InterruptAsync(string sessionId, CancellationToken ct);
+    Task CancelInboxAsync(string sessionId, string messageId, CancellationToken ct);
     Task<ApiPage<OpenCodeMessage>> GetMessagesAsync(string sessionId, string? cursor, CancellationToken ct);
     Task<List<OpenCodeInbox>> GetInboxAsync(string sessionId, CancellationToken ct);
     Task<List<OpenCodePermission>> GetPermissionsAsync(string sessionId, CancellationToken ct);

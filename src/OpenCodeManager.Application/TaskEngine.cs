@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 using OpenCodeManager.Domain;
 namespace OpenCodeManager.Application;
 
-public sealed class TaskEngine(IManagerDbFactory factory, IOpenCodeClient api, IPathPolicy paths, PermissionManager permissions, TaskExecutionOptions options, ILogger<TaskEngine> logger)
+public sealed class TaskEngine(IManagerDbFactory factory, IOpenCodeClient api, IPathPolicy paths, PermissionManager permissions, TaskExecutionOptions options, ILogger<TaskEngine> logger, IFileManager? fileManager = null)
 {
     private readonly SemaphoreSlim gate = new(1);
     public DateTime? LastSuccessfulTickUtc { get; private set; }
@@ -21,10 +21,11 @@ public sealed class TaskEngine(IManagerDbFactory factory, IOpenCodeClient api, I
         {
             await using var db = await factory.CreateAsync(ct);
             var active = await db.Tasks.Where(x => x.Status == AgentTaskStatus.Running || x.Status == AgentTaskStatus.AwaitingApproval || x.Status == AgentTaskStatus.NeedsReconciliation).Select(x => x.Id).ToListAsync(ct);
+            bool reconcileFailed=false;
             foreach (var id in active)
             {
                 try { await ReconcileAsync(id, ct); }
-                catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested) { LastError = SafeError(e); logger.LogWarning("Task {TaskId} reconciliation failed: {ErrorType}", id, e.GetType().Name); }
+                catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested) { reconcileFailed=true; LastError = SafeError(e); logger.LogWarning("Task {TaskId} reconciliation failed: {ErrorType}", id, e.GetType().Name); }
             }
             int count = await db.Tasks.CountAsync(x => x.Status == AgentTaskStatus.Dispatching || x.Status == AgentTaskStatus.Running || x.Status == AgentTaskStatus.AwaitingApproval || x.Status == AgentTaskStatus.NeedsReconciliation, ct);
             var queue = await db.Tasks.AsNoTracking().Where(x => x.Status == AgentTaskStatus.Queued).OrderBy(x => x.CreatedAtUtc).Take(100).ToListAsync(ct);
@@ -34,7 +35,7 @@ public sealed class TaskEngine(IManagerDbFactory factory, IOpenCodeClient api, I
                 if (await db.Tasks.AnyAsync(x => x.LockKey == task.LockKey && (x.Status == AgentTaskStatus.Dispatching || x.Status == AgentTaskStatus.Running || x.Status == AgentTaskStatus.AwaitingApproval || x.Status == AgentTaskStatus.NeedsReconciliation), ct)) continue;
                 if (await DispatchAsync(task.Id, ct)) count++;
             }
-            LastSuccessfulTickUtc = DateTime.UtcNow; LastError = null;
+            LastSuccessfulTickUtc = DateTime.UtcNow; if(!reconcileFailed) LastError = null;
         }
         finally { gate.Release(); }
     }
@@ -67,12 +68,15 @@ public sealed class TaskEngine(IManagerDbFactory factory, IOpenCodeClient api, I
         bool sending = false;
         try
         {
-            await api.UpdateSessionAsync(session.OpenCodeSessionId, null, null, ManagerService.SessionRules(), ct);
+            await api.UpdateSessionAsync(session.OpenCodeSessionId, null, null, ManagerService.SessionRules().Concat(remote.Permissions?.Where(x=>x.Effect=="deny") ?? []).ToList(), ct);
             if (task.ModelId is not null && task.ProviderId is not null) await api.SwitchModelAsync(session.OpenCodeSessionId, new(task.ModelId, task.ProviderId), ct);
             if (task.AgentName is not null) await api.SwitchAgentAsync(session.OpenCodeSessionId, task.AgentName, ct);
             // The preceding durable transaction is the boundary: any ambiguous POST is never retried.
+            var attachedFiles = fileManager is null ? null : await fileManager.PrepareTaskFilesAsync(task.Id, dir, task.ProviderId, task.ModelId, ct);
+            if(await db.Tasks.AsNoTracking().Where(x=>x.Id==task.Id).Select(x=>x.CancelRequested).SingleAsync(ct))
+            { task.Status=AgentTaskStatus.Cancelled;attempt.Status=AttemptStatus.Cancelled;task.CompletedAtUtc=DateTime.UtcNow;attempt.CompletedAtUtc=DateTime.UtcNow;await db.SaveChangesAsync(ct);return false; }
             sending = true;
-            var input = await api.SendPromptAsync(session.OpenCodeSessionId, new(attempt.OpenCodeMessageId!, task.Prompt + "\n\nПроверяй результат сборкой и тестами. Исправляй ошибки, не скрывай неуспешные проверки. Максимум циклов проверки: " + options.MaxVerificationCycles + ".", new() { ["managerTaskId"] = task.Id.ToString() }), ct);
+            var input = await api.SendPromptAsync(session.OpenCodeSessionId, new(attempt.OpenCodeMessageId!, task.Prompt + "\n\nПроверяй результат сборкой и тестами. Исправляй ошибки, не скрывай неуспешные проверки. Максимум циклов проверки: " + options.MaxVerificationCycles + ".", new() { ["managerTaskId"] = task.Id.ToString() }, attachedFiles), ct);
             if (input.Id != attempt.OpenCodeMessageId) throw new InvalidOperationException("Server changed client message ID");
             task.Status = AgentTaskStatus.Running; task.CurrentAction = "Промпт принят OpenCode"; attempt.Status = AttemptStatus.Running;
             await db.SaveChangesAsync(ct); logger.LogInformation("Task {TaskId} admitted as {MessageId}", task.Id, input.Id); return true;
@@ -111,7 +115,15 @@ public sealed class TaskEngine(IManagerDbFactory factory, IOpenCodeClient api, I
         var inbox = await api.GetInboxAsync(session.OpenCodeSessionId, ct);
         if (start < 0)
         {
-            if (inbox.Any(x => x.Id == attempt.OpenCodeMessageId)) { task.Status = AgentTaskStatus.Running; attempt.Status = AttemptStatus.Running; }
+            if (inbox.Any(x => x.Id == attempt.OpenCodeMessageId))
+            {
+                if(task.CancelRequested || DateTime.UtcNow-task.StartedAtUtc>TimeSpan.FromMinutes(options.MaxDurationMinutes))
+                {
+                    await api.CancelInboxAsync(session.OpenCodeSessionId,attempt.OpenCodeMessageId,ct);
+                    task.Status=AgentTaskStatus.Cancelled;attempt.Status=AttemptStatus.Cancelled;task.CompletedAtUtc=DateTime.UtcNow;attempt.CompletedAtUtc=DateTime.UtcNow;
+                }
+                else { task.Status = AgentTaskStatus.Running; attempt.Status = AttemptStatus.Running; }
+            }
             else { task.Status = AgentTaskStatus.NeedsReconciliation; task.LastError = "Prompt admission unconfirmed; no automatic resend"; }
             await db.SaveChangesAsync(ct); return;
         }
@@ -139,7 +151,7 @@ public sealed class TaskEngine(IManagerDbFactory factory, IOpenCodeClient api, I
             await db.SaveChangesAsync(ct); return;
         }
         task.Status = AgentTaskStatus.Running; attempt.Status = AttemptStatus.Running;
-        var toolCalls = await db.Events.CountAsync(x => x.AttemptId == attempt.Id && x.EventType == "session.tool.called", ct);
+        var toolCalls = task.ObservedToolCalls;
         bool timedOut = DateTime.UtcNow - task.StartedAtUtc > TimeSpan.FromMinutes(options.MaxDurationMinutes);
         if (task.CancelRequested || timedOut || toolCalls >= options.MaxToolCalls)
         {
@@ -168,6 +180,7 @@ public sealed class TaskEngine(IManagerDbFactory factory, IOpenCodeClient api, I
             if (ev.Data.TryGetProperty("name", out var name) && name.ValueKind == System.Text.Json.JsonValueKind.String) summary += ": " + name.GetString();
             if (ev.Data.TryGetProperty("native", out var native) && native.ValueKind == System.Text.Json.JsonValueKind.Object && native.TryGetProperty("name", out var tool)) summary += ": " + tool.GetString();
             task.CurrentAction = summary;
+            if (ev.Type == "session.tool.called") task.ObservedToolCalls++;
             db.Events.Add(new TaskEvent { AttemptId = attempt.Id, OpenCodeEventId = ev.Id, EventType = ev.Type, Summary = summary });
             await db.SaveChangesAsync(ct);
             var overflow = await db.Events.Where(x => x.AttemptId == attempt.Id).OrderByDescending(x => x.OccurredAtUtc).Skip(options.MaxEventsPerAttempt).Select(x => x.Id).ToListAsync(ct);
@@ -175,5 +188,5 @@ public sealed class TaskEngine(IManagerDbFactory factory, IOpenCodeClient api, I
         }
         finally { gate.Release(); }
     }
-    private static string SafeError(Exception e) => e is OpenCodeApiException apiError ? apiError.Message : e.GetType().Name;
+    private static string SafeError(Exception e) => e switch { OpenCodeApiException apiError => apiError.Message, AttachmentPreparationException fileError => fileError.Message, _ => e.GetType().Name };
 }

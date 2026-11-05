@@ -47,6 +47,7 @@ public sealed class AgentTask : Entity
     public string? LastError { get; set; }
     public string DeduplicationKey { get; set; } = Guid.NewGuid().ToString("N");
     public string LockKey { get; set; } = "";
+    public int ObservedToolCalls { get; set; }
     public bool CancelRequested { get; set; }
     public long CreatedByTelegramUserId { get; set; }
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
@@ -106,6 +107,12 @@ public sealed class NavigationState : Entity
     public string? DefaultModelId { get; set; }
     public string? DefaultAgent { get; set; }
     public string? InputMode { get; set; }
+    public string? DraftProviderId { get; set; }
+    public string? DraftModelId { get; set; }
+    public string? DraftAgent { get; set; }
+    public string? FileSearchQuery { get; set; }
+    public string? SelectedFilesJson { get; set; }
+    public string? PendingFileIdsJson { get; set; }
     public string? BrowserPath { get; set; }
     public int? BrowserMessageId { get; set; }
     public bool ShowHiddenDirectories { get; set; }
@@ -137,4 +144,33 @@ public sealed class DirectoryBookmark : Entity
     public string CanonicalPath { get; set; } = "";
     public bool IsFavorite { get; set; }
     public DateTime LastOpenedAtUtc { get; set; } = DateTime.UtcNow;
+}
+
+public sealed class FileAttachment : Entity
+{
+    public string OriginalName { get; set; } = "";
+    public string LocalPath { get; set; } = "";
+    public string MimeType { get; set; } = "application/octet-stream";
+    public long Size { get; set; }
+    public string? TelegramFileId { get; set; }
+    public Guid? TaskId { get; set; }
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+    public DateTime ExpiresAtUtc { get; set; } = DateTime.UtcNow.AddDays(7);
+    public int? Width { get; set; }
+    public int? Height { get; set; }
+}
+public sealed class FileTransfer : Entity
+{
+    public Guid? AttachmentId { get; set; }
+    public string Direction { get; set; } = "";
+    public string Status { get; set; } = "Pending";
+    public string? Error { get; set; }
+    public string? LocalPath { get; set; }
+    public DateTime StartedAtUtc { get; set; } = DateTime.UtcNow;
+    public DateTime? CompletedAtUtc { get; set; }
+}
+public sealed class TaskFile : Entity
+{
+    public Guid TaskId { get; set; }
+    public Guid AttachmentId { get; set; }
 }
