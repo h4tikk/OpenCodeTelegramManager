@@ -65,6 +65,8 @@ public sealed class OpenCodeApiClient(HttpClient http, OpenCodeOptions options) 
 
     private static string E(string s) => Uri.EscapeDataString(s);
     private static string Location(string? dir) => dir is null ? "" : "?location%5Bdirectory%5D=" + E(dir);
+    public async Task<List<OpenCodePlugin>> GetPluginsAsync(string directory, CancellationToken ct) => (await Get<ApiData<List<OpenCodePlugin>>>("/api/plugin" + Location(directory), ct)).Data;
+    public Task SetSessionMetadataAsync(string sessionId, Dictionary<string, JsonElement> metadata, CancellationToken ct) => Write(HttpMethod.Patch, "/api/session/" + E(sessionId), new { metadata }, ct);
     public Task<ServerInfo> GetInfoAsync(CancellationToken ct) => Get<ServerInfo>("/api/info", ct);
     public Task<List<OpenCodeProject>> GetProjectsAsync(CancellationToken ct) => Get<List<OpenCodeProject>>("/api/project", ct);
     public async Task<List<OpenCodeModel>> GetModelsAsync(string? directory, CancellationToken ct) => (await Get<ApiData<List<OpenCodeModel>>>("/api/model" + Location(directory), ct)).Data;

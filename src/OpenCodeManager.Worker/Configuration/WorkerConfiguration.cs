@@ -2,7 +2,7 @@ using Microsoft.Extensions.Configuration;
 using OpenCodeManager.Application;
 
 namespace OpenCodeManager.Worker;
-public sealed record WorkerConfiguration(TelegramOptions Telegram, BotSecurityOptions Security, OpenCodeOptions OpenCode, TaskExecutionOptions Execution, StorageOptions Storage, ProjectOptions Projects, FileStorageOptions Files)
+public sealed record WorkerConfiguration(TelegramOptions Telegram, BotSecurityOptions Security, OpenCodeOptions OpenCode, TaskExecutionOptions Execution, StorageOptions Storage, ProjectOptions Projects, FileStorageOptions Files, AutonomyOptions Autonomy)
 {
     public bool TelegramConfigured => Security.OwnerUserId > 0 && !string.IsNullOrWhiteSpace(Telegram.Token);
 
@@ -11,7 +11,7 @@ public sealed record WorkerConfiguration(TelegramOptions Telegram, BotSecurityOp
         configuration.AddProtectedEnvironmentFile();
         T Get<T>(string section)
             where T : class, new() => configuration.GetSection(section).Get<T>() ?? new();
-        return new(Get<TelegramOptions>("Telegram"), Get<BotSecurityOptions>("BotSecurity"), Get<OpenCodeOptions>("OpenCode"), Get<TaskExecutionOptions>("TaskExecution"), Get<StorageOptions>("Storage"), Get<ProjectOptions>("Projects"), Get<FileStorageOptions>("Files"));
+        return new(Get<TelegramOptions>("Telegram"), Get<BotSecurityOptions>("BotSecurity"), Get<OpenCodeOptions>("OpenCode"), Get<TaskExecutionOptions>("TaskExecution"), Get<StorageOptions>("Storage"), Get<ProjectOptions>("Projects"), Get<FileStorageOptions>("Files"), Get<AutonomyOptions>("Autonomy"));
     }
 
     public void Validate()

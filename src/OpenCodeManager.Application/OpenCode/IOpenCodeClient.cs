@@ -1,6 +1,8 @@
 namespace OpenCodeManager.Application;
 public interface IOpenCodeClient
 {
+    Task<List<OpenCodePlugin>> GetPluginsAsync(string directory, CancellationToken ct);
+    Task SetSessionMetadataAsync(string sessionId, Dictionary<string, System.Text.Json.JsonElement> metadata, CancellationToken ct);
     Task<ServerInfo> GetInfoAsync(CancellationToken ct);
     Task<List<OpenCodeProject>> GetProjectsAsync(CancellationToken ct);
     Task<List<OpenCodeModel>> GetModelsAsync(string? directory, CancellationToken ct);

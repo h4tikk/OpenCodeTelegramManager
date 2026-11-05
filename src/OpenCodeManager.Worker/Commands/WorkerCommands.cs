@@ -5,7 +5,7 @@ using OpenCodeManager.Application;
 using OpenCodeManager.Infrastructure;
 
 namespace OpenCodeManager.Worker;
-public sealed class WorkerCommands(IDbContextFactory<ManagerDbContext> factory, DirectoryNavigation directories, SessionManager sessions, IFileManager files, DiagnosticCommand diagnostics, WorkerConfiguration configuration, ILogger<WorkerCommands> logger)
+public sealed class WorkerCommands(IDbContextFactory<ManagerDbContext> factory, DirectoryNavigation directories, SessionManager sessions, IFileManager files, DiagnosticCommand diagnostics, WorkerConfiguration configuration, ILogger<WorkerCommands> logger, ISessionAutonomy autonomy)
 {
     public async Task<int> ExecuteAsync(IHost host, string command, CancellationToken ct)
     {
@@ -45,6 +45,15 @@ public sealed class WorkerCommands(IDbContextFactory<ManagerDbContext> factory, 
         catch (Exception error)
         {
             logger.LogWarning("Initial OpenCode synchronization unavailable: {ErrorType}", error.GetType().Name);
+        }
+
+        try
+        {
+            await autonomy.ConfigureActiveTasksAsync(ct);
+        }
+        catch (Exception error)
+        {
+            logger.LogWarning("Active task autonomy setup unavailable: {ErrorType}", error.GetType().Name);
         }
 
         await files.CleanupAsync(ct);

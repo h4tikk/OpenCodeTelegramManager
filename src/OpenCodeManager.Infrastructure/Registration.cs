@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using OpenCodeManager.Application;
 
 namespace OpenCodeManager.Infrastructure;
@@ -9,6 +10,8 @@ public static class Registration
     {
         services.AddDbContextFactory<ManagerDbContext>(o => o.UseSqlite(new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder { DataSource = storage.DatabasePath, DefaultTimeout = 15, ForeignKeys = true }.ToString()));
         services.AddSingleton<IManagerDbFactory, ManagerDbFactory>();
+        services.TryAddSingleton<AutonomyOptions>();
+        services.AddSingleton<ISessionAutonomy, SessionAutonomy>();
         services.AddSingleton<IPathPolicy, PathPolicy>();
         services.AddSingleton<IProjectTechnologyDetector, ProjectTechnologyDetector>();
         services.AddSingleton<FileAccessPolicy>();

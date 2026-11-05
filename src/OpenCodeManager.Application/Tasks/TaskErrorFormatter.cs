@@ -5,6 +5,7 @@ internal static class TaskErrorFormatter
     {
         OpenCodeApiException apiError => apiError.Message,
         AttachmentPreparationException fileError => fileError.Message,
+        AutonomyUnavailableException autonomyError => autonomyError.Message,
         _ => e.GetType().Name
     };
 }

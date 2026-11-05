@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 using OpenCodeManager.Domain;
 
 namespace OpenCodeManager.Application;
-public sealed class PermissionManager(IManagerDbFactory factory, IOpenCodeClient api, IPathPolicy paths, OwnerGuard guard, ILogger<PermissionManager> logger)
+public sealed class PermissionManager(IManagerDbFactory factory, IOpenCodeClient api, IPathPolicy paths, OwnerGuard guard, ILogger<PermissionManager> logger, AutonomyOptions? autonomy = null)
 {
     private readonly SemaphoreSlim gate = new(1);
     public bool CanAutoApprove(string action, IEnumerable<string> resources, string workingDirectory)
@@ -31,6 +31,10 @@ public sealed class PermissionManager(IManagerDbFactory factory, IOpenCodeClient
             if (!canonical.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal))
                 return false;
             var name = Path.GetFileName(canonical);
+            if (canonical.Split('/').Any(x => x is ".opencode" or ".agents" or ".claude") || name is "opencode.json" or "opencode.jsonc" or ".opencode.json" or ".opencode.jsonc")
+                return false;
+            if (action == "edit" && System.Text.RegularExpressions.Regex.IsMatch(name, @"\.(db|sqlite|sqlite3)(-(wal|shm))?$", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                return false;
             if (name.StartsWith(".env", StringComparison.OrdinalIgnoreCase) || canonical.Split('/').Any(p => p.Equals("secrets", StringComparison.OrdinalIgnoreCase)) || name.Contains("credential", StringComparison.OrdinalIgnoreCase) || name.Contains("secret", StringComparison.OrdinalIgnoreCase) || name.EndsWith(".key", StringComparison.OrdinalIgnoreCase) || name is "auth.json" or "service.json" or "id_rsa" or "id_ed25519")
                 return false;
         }
@@ -67,14 +71,15 @@ public sealed class PermissionManager(IManagerDbFactory factory, IOpenCodeClient
 
                 if (request.Status != ApprovalStatus.Pending)
                     continue;
-                if (CanAutoApprove(remote.Action, remote.Resources, session.WorkingDirectory))
+                bool approved = CanAutoApprove(remote.Action, remote.Resources, session.WorkingDirectory);
+                if (approved || autonomy?.Enabled == true)
                 {
                     request.Status = ApprovalStatus.Resolving;
                     await db.SaveChangesAsync(ct);
                     try
                     {
-                        await api.ReplyPermissionAsync(remote.SessionId, remote.Id, "once", ct);
-                        request.Status = ApprovalStatus.Approved;
+                        await api.ReplyPermissionAsync(remote.SessionId, remote.Id, approved ? "once" : "reject", ct);
+                        request.Status = approved ? ApprovalStatus.Approved : ApprovalStatus.Rejected;
                         request.ResolvedAtUtc = DateTime.UtcNow;
                         await db.SaveChangesAsync(ct);
                     }

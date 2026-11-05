@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, symlinkSync, rmSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { decide, commandRisk } from './policy.mjs';
+import { install } from './integration.mjs';
+const root = mkdtempSync(path.join(os.tmpdir(),'manager-policy-'));
+try {
+  mkdirSync(path.join(root,'src'));
+  symlinkSync('/etc',path.join(root,'escape'));
+  assert.equal(decide('edit',['src/Program.cs'],root),'allow');
+  assert.equal(decide('glob',['**/*.cs'],root),'allow');
+  assert.equal(decide('read',['.'],root),'allow');
+  for(const value of ['.env','secrets/a.txt','escape/passwd','../outside']) assert.equal(decide('read',[value],root),'deny');
+  assert.equal(decide('shell',['sudo id'],root),'deny');
+  assert.equal(commandRisk('git push origin main'),true);
+  assert.equal(commandRisk('dotnet test && dotnet build'),false);
+  const hooks=[];let shell;let observed;
+  const sessions={managed:{id:'managed',location:{directory:root},metadata:{opencodeManagerAutonomy:{version:1,enabled:true,directory:root}}},child:{id:'child',parentID:'managed',location:{directory:root}},normal:{id:'normal'}};
+  await install({session:{get:async({sessionID})=>sessions[sessionID]},permission:{hook:async(_,fn)=>hooks.push(fn)},tool:{transform:async fn=>fn({update:(_,fn)=>{shell={execute:async input=>(observed=input,{content:'ok'})};fn(shell);}})}},{roots:[root],runner:'/private/sandbox.py'});
+  await shell.execute({command:'dotnet test'},{sessionID:'child'});
+  assert.match(observed.command,/^\/usr\/bin\/python3 '\/private\/sandbox.py' '[A-Za-z0-9_-]+'$/);
+  let event={sessionID:'child',action:'shell',resources:[observed.command],effect:'ask'};for(const hook of hooks)await hook(event);assert.equal(event.effect,'allow');
+  event={sessionID:'child',action:'shell',resources:[observed.command.replace('sandbox.py','sandboxXpy')],effect:'ask'};for(const hook of hooks)await hook(event);assert.equal(event.effect,'deny');
+  event={sessionID:'child',action:'shell',resources:[observed.command],effect:'deny'};for(const hook of hooks)await hook(event);assert.equal(event.effect,'deny');
+  await assert.rejects(()=>shell.execute({command:'sudo id'},{sessionID:'managed'}));
+  await shell.execute({command:'echo normal'},{sessionID:'normal'});assert.equal(observed.command,'echo normal');
+  event={sessionID:'normal',action:'shell',resources:['anything'],effect:'ask'};for(const hook of hooks)await hook(event);assert.equal(event.effect,'ask');
+  console.log('Autonomy policy, wrapper, child scope, explicit deny, normal sessions: PASS');
+} finally {rmSync(root,{recursive:true,force:true});}

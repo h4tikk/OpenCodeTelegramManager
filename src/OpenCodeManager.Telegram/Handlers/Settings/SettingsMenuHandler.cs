@@ -2,7 +2,7 @@ using OpenCodeManager.Application;
 using static OpenCodeManager.Telegram.TelegramKeyboards;
 
 namespace OpenCodeManager.Telegram;
-public sealed class SettingsMenuHandler(TelegramUi ui, NavigationService navigation, SessionManager sessions, PermissionManager permissions) : TelegramHandler(ui), ITelegramCallbackHandler
+public sealed class SettingsMenuHandler(TelegramUi ui, NavigationService navigation, SessionManager sessions, PermissionManager permissions, AutonomyOptions autonomy) : TelegramHandler(ui), ITelegramCallbackHandler
 {
     public IReadOnlySet<string> Actions { get; } = new HashSet<string>
     {
@@ -45,7 +45,7 @@ public sealed class SettingsMenuHandler(TelegramUi ui, NavigationService navigat
                 await SendTextAsync("Теперь выбор модели и агента меняет значения по умолчанию.", Menu, ct);
                 return true;
             case "settings":
-                await SendTextAsync("Параллелизм и лимиты задаются в защищённой конфигурации. Shell требует подтверждения: общий OpenCode работает с правами владельца. Ограниченные правила разрешены только для проверенных файлов проекта. /cancel сбрасывает ввод.", new(new[] { new[] { B("Синхронизация", "sync", "0"), B("Добавить каталог", "addproject", "0") }, new[] { B("Выбрать defaults", "defaults", "0"), B("Меню", "home", "0") } }), ct);
+                await SendTextAsync(autonomy.Enabled ? "Автономный режим: безопасные действия проекта разрешаются автоматически, опасные отклоняются с объяснением. Shell работает в изолированной копии без сети и секретов хоста; доступны локальные кэши зависимостей. Лимиты задаются в защищённой конфигурации. /cancel сбрасывает ввод." : "Ручной режим разрешений: безопасные файлы проекта подтверждаются автоматически, остальные действия требуют решения владельца. Лимиты задаются в защищённой конфигурации. /cancel сбрасывает ввод.", new(new[] { new[] { B("Синхронизация", "sync", "0"), B("Добавить каталог", "addproject", "0") }, new[] { B("Выбрать defaults", "defaults", "0"), B("Меню", "home", "0") } }), ct);
                 return true;
         }
 

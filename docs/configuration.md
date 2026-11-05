@@ -13,3 +13,5 @@
 `Telegram__MaxAttachmentBytes=5242880`, `Telegram__StatusIntervalSeconds=5`. FileStorageOptions связывается с секцией `Files`: MaxDownloadBytes, MaxArchiveBytes, MaxArchiveFiles, MaxArchiveDepth, MaxArchiveSeconds, MaxImagePixels. Данные uploads переживают пересоздание; непривязанные вложения по умолчанию истекают через 7 дней, привязанные к задачам сохраняются для воспроизводимости. Очистка выполняется при запуске. Неуспевшие передачи становятся NeedsReconciliation и автоматически не повторяются.
 
 Скрипт `scripts/configure-secrets.py` вводит токен скрыто, проверяет getMe и пересоздаёт контейнер. Создание бота в BotFather и личный `/start` выполняет владелец.
+
+`Autonomy__Enabled=true` включает автоматическую оценку действий сессий менеджера и изолированный shell host-плагина. Отключение: `false`, затем restart контейнера. См. [autonomy.md](autonomy.md).

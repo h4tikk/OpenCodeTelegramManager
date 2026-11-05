@@ -17,10 +17,9 @@ public static class WorkerRegistration
             configuration.Execution,
             configuration.Storage,
             configuration.Projects,
-            configuration.Files
-        }
-
-        )
+            configuration.Files,
+            configuration.Autonomy
+        })
             services.AddSingleton(options.GetType(), options);
         services.AddSingleton(configuration);
         services.AddSingleton<OwnerGuard>();

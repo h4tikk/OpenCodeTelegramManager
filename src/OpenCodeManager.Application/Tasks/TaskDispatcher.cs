@@ -4,7 +4,7 @@ using OpenCodeManager.Domain;
 using static OpenCodeManager.Application.TaskErrorFormatter;
 
 namespace OpenCodeManager.Application;
-public sealed class TaskDispatcher(IManagerDbFactory factory, IOpenCodeClient api, IPathPolicy paths, TaskExecutionOptions options, ILogger<TaskDispatcher> logger, IFileManager? fileManager = null)
+public sealed class TaskDispatcher(IManagerDbFactory factory, IOpenCodeClient api, IPathPolicy paths, TaskExecutionOptions options, ILogger<TaskDispatcher> logger, IFileManager? fileManager = null, ISessionAutonomy? autonomy = null)
 {
     public async Task<bool> DispatchAsync(Guid id, CancellationToken ct)
     {
@@ -57,6 +57,8 @@ public sealed class TaskDispatcher(IManagerDbFactory factory, IOpenCodeClient ap
         bool sending = false;
         try
         {
+            if (autonomy is not null)
+                await autonomy.ConfigureAsync(remote, dir, ct);
             await api.UpdateSessionAsync(session.OpenCodeSessionId, null, null, SessionPermissionPolicy.CreateRules().Concat(remote.Permissions?.Where(x => x.Effect == "deny") ?? []).ToList(), ct);
             if (task.ModelId is not null && task.ProviderId is not null)
                 await api.SwitchModelAsync(session.OpenCodeSessionId, new(task.ModelId, task.ProviderId), ct);
@@ -75,7 +77,7 @@ public sealed class TaskDispatcher(IManagerDbFactory factory, IOpenCodeClient ap
             }
 
             sending = true;
-            var input = await api.SendPromptAsync(session.OpenCodeSessionId, new(attempt.OpenCodeMessageId!, task.Prompt + "\n\nПроверяй результат сборкой и тестами. Исправляй ошибки, не скрывай неуспешные проверки. Максимум циклов проверки: " + options.MaxVerificationCycles + ".", new() { ["managerTaskId"] = task.Id.ToString() }, attachedFiles), ct);
+            var input = await api.SendPromptAsync(session.OpenCodeSessionId, new(attempt.OpenCodeMessageId!, task.Prompt + (autonomy?.Enabled != true ? "" : "\n\nРаботай самостоятельно в выбранном проекте. Политика разрешений оценивает действия автоматически: не проси владельца подтвердить обычные операции и не обходи отказ. При недоступной зависимости или ограничении среды укажи конкретный блокер. Shell изолирован, без сети, с локальными кэшами зависимостей; изменения обычных файлов возвращаются в проект, конфигурация OpenCode и секреты исключены.") + "\n\nПроверяй результат сборкой и тестами. Исправляй ошибки, не скрывай неуспешные проверки. Максимум циклов проверки: " + options.MaxVerificationCycles + ".", new() { ["managerTaskId"] = task.Id.ToString() }, attachedFiles), ct);
             if (input.Id != attempt.OpenCodeMessageId)
                 throw new InvalidOperationException("Server changed client message ID");
             task.Status = AgentTaskStatus.Running;
