@@ -7,8 +7,11 @@ public sealed class ModelManager(IManagerDbFactory factory, IOpenCodeClient api,
     public async Task SelectModelAsync(Guid? sessionId, ModelRef model, long owner, CancellationToken ct, bool taskOnly = false)
     {
         guard.Demand(owner);
+
         await using var db = await factory.CreateAsync(ct);
+
         AgentSession? s = sessionId is null ? null : await db.Sessions.SingleAsync(x => x.Id == sessionId, ct);
+
         if (s is not null)
             paths.DemandAllowed(s.WorkingDirectory);
         if (!(await api.GetModelsAsync(s?.WorkingDirectory, ct)).Any(x => x.Id == model.Id && x.ProviderId == model.ProviderId && x.Enabled))

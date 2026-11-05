@@ -7,9 +7,11 @@ public sealed class DirectoryNavigation(IManagerDbFactory factory, IPathPolicy p
     public async Task InitializeRootsAsync(CancellationToken ct)
     {
         await using var db = await factory.CreateAsync(ct);
+
         foreach (var path in options.AllowedRoots.Where(Directory.Exists))
         {
             var canonical = paths.DemandAllowed(path);
+
             if (!await db.Roots.AnyAsync(x => x.CanonicalPath == canonical, ct))
                 db.Roots.Add(new RegisteredRoot { CanonicalPath = canonical, Name = Path.GetFileName(canonical) });
         }
@@ -26,9 +28,13 @@ public sealed class DirectoryNavigation(IManagerDbFactory factory, IPathPolicy p
     public async Task VisitAsync(string path, long owner, CancellationToken ct)
     {
         guard.Demand(owner);
+
         var canonical = paths.DemandAllowed(path);
+
         await using var db = await factory.CreateAsync(ct);
+
         var item = await db.Bookmarks.SingleOrDefaultAsync(x => x.OwnerUserId == owner && x.CanonicalPath == canonical, ct);
+        
         if (item is null)
         {
             item = new()
@@ -40,8 +46,11 @@ public sealed class DirectoryNavigation(IManagerDbFactory factory, IPathPolicy p
         }
 
         item.LastOpenedAtUtc = DateTime.UtcNow;
+
         await db.SaveChangesAsync(ct);
+
         var old = await db.Bookmarks.Where(x => x.OwnerUserId == owner && !x.IsFavorite).OrderByDescending(x => x.LastOpenedAtUtc).Skip(50).Select(x => x.Id).ToListAsync(ct);
+
         if (old.Count > 0)
             await db.Bookmarks.Where(x => old.Contains(x.Id)).ExecuteDeleteAsync(ct);
     }
@@ -49,8 +58,11 @@ public sealed class DirectoryNavigation(IManagerDbFactory factory, IPathPolicy p
     public async Task ToggleFavoriteAsync(string path, long owner, CancellationToken ct)
     {
         await VisitAsync(path, owner, ct);
+
         var canonical = paths.DemandAllowed(path);
+        
         await using var db = await factory.CreateAsync(ct);
+
         var item = await db.Bookmarks.SingleAsync(x => x.OwnerUserId == owner && x.CanonicalPath == canonical, ct);
         item.IsFavorite = !item.IsFavorite;
         await db.SaveChangesAsync(ct);
