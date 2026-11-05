@@ -11,3 +11,16 @@
 .vs/
 .vscode/
 TestResults/
+.env.*
+!.env.example
+secrets/
+**/secrets/
+*.secret
+*.pem
+*.key
+worker.heartbeat
+uploads/
+downloads/
+attachments/
+__pycache__/
+*.pyc

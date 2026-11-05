@@ -1,0 +1,53 @@
+name: opencode-manager
+services:
+  opencode-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      network: host
+    image: opencode-manager:local
+    container_name: opencode-manager
+    network_mode: host
+    restart: unless-stopped
+    user: "${MANAGER_UID:-1000}:${MANAGER_GID:-1000}"
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 45s
+    mem_limit: 768m
+    pids_limit: 128
+    environment:
+      Manager__EnvironmentFile: /run/secrets/manager_env
+      Storage__DatabasePath: ${MANAGER_DATA_DIR:-/home/hatikk/.local/share/opencode-manager}/manager.db
+      Files__DataDirectory: ${MANAGER_DATA_DIR:-/home/hatikk/.local/share/opencode-manager}
+      Projects__AllowedRoots__0: /mnt/data/Projects
+      HOME: /tmp
+      XDG_CACHE_HOME: /tmp/cache
+    secrets: [manager_env]
+    volumes:
+      - type: bind
+        source: /mnt/data/Projects
+        target: /mnt/data/Projects
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${MANAGER_DATA_DIR:-/home/hatikk/.local/share/opencode-manager}
+        target: ${MANAGER_DATA_DIR:-/home/hatikk/.local/share/opencode-manager}
+        bind:
+          create_host_path: false
+    tmpfs: ["/tmp:rw,nosuid,nodev,size=128m,mode=1777"]
+    healthcheck:
+      test: ["CMD", "dotnet", "OpenCodeManager.Worker.dll", "--health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+secrets:
+  manager_env:
+    file: ${MANAGER_ENV_FILE:-/home/hatikk/.config/opencode-manager/manager.env}
